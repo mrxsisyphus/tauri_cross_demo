@@ -1,0 +1,13 @@
+{
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../build"
+  },
+  "bundle": {
+    "iOS": {
+      "developmentTeam": "YOUR_TEAM_ID"
+    }
+  }
+}

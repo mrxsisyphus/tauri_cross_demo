@@ -1,0 +1,41 @@
+# Rust
+/target/
+Cargo.lock
+
+# Node
+node_modules/
+.pnpm-store/
+
+# Build outputs
+/dist/
+/build/
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Tauri
+/app/src-tauri/target/
+
+# Server database
+*.db
+*.db-wal
+*.db-shm
+
+# Mobile
+/app/src-tauri/gen/
+*.apk
+*.aab
+*.ipa

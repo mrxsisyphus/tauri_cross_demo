@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Todo Cross",
+  "version": "0.1.0",
+  "identifier": "com.example.todocross",
+  "build": {
+    "beforeDevCommand": "bun run dev",
+    "devUrl": "http://localhost:5173",
+    "beforeBuildCommand": "bun run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Todo Cross",
+        "width": 1000,
+        "height": 700,
+        "minWidth": 400,
+        "minHeight": 500,
+        "resizable": true,
+        "fullscreen": false,
+        "center": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      
+    ],
+    "category": "Productivity",
+    "shortDescription": "Cross-platform Todo App",
+    "longDescription": "A beautiful cross-platform todo application built with Tauri 2.0, supporting Windows, macOS, Linux, Android, and iOS.",
+    "linux": {
+      "appimage": {
+        "bundleMediaFramework": true
+      }
+    },
+    "macOS": {
+      "minimumSystemVersion": "10.13"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser"
+      }
+    }
+  },
+  "plugins": {
+    "shell": {
+      "open": true
+    },
+    "http": {
+      "enabled": true,
+      "scope": [
+        "http://localhost:3001/**",
+        "https://**"
+      ]
+    }
+  }
+}
