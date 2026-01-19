@@ -16,6 +16,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Ensure workflows can create releases and upload assets using GITHUB_TOKEN
+permissions:
+  contents: write
+
 jobs:
   prepare:
     runs-on: ubuntu-latest
@@ -95,7 +99,8 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || needs.prepare.outputs.tag_name }}
           releaseName: 'Todo Cross ${{ github.ref_name || needs.prepare.outputs.tag_name }}'
           releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
+          # Create a published release (not draft) so it appears on Releases page
+          releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
 
@@ -173,7 +178,8 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || needs.prepare.outputs.tag_name }}
           releaseName: 'Todo Cross ${{ github.ref_name || needs.prepare.outputs.tag_name }}'
           releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
+          # Create a published release (not draft) so it appears on Releases page
+          releaseDraft: false
           prerelease: false
 
       - name: Upload Android artifacts
@@ -181,8 +187,21 @@ jobs:
         with:
           name: android-apk
           path: |
-            app/src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+            # include any APKs, Android App Bundles and split/APKS produced by Gradle
+            app/src-tauri/gen/android/app/build/outputs/**/*.apk
+            app/src-tauri/gen/android/app/build/outputs/**/*.aab
+            app/src-tauri/gen/android/app/build/outputs/**/*.apks
+            # fallback: include everything under the outputs directory so nothing is missed
+            app/src-tauri/gen/android/app/build/outputs/**
           if-no-files-found: ignore
+
+      - name: Show Android outputs (debug)
+        if: always()
+        run: |
+          echo "Listing Android outputs dir"
+          ls -la app/src-tauri/gen/android/app/build || true
+          ls -la app/src-tauri/gen/android/app/build/outputs || true
+ 
 
   # Build for iOS (macOS runner required)
   build-ios:
@@ -228,7 +247,8 @@ jobs:
           tagName: ${{ github.ref_type == 'tag' && github.ref_name || needs.prepare.outputs.tag_name }}
           releaseName: 'Todo Cross ${{ github.ref_name || needs.prepare.outputs.tag_name }}'
           releaseBody: 'See the assets to download this version and install.'
-          releaseDraft: true
+          # Create a published release (not draft) so it appears on Releases page
+          releaseDraft: false
           prerelease: false
 
       - name: Upload iOS artifacts
@@ -272,7 +292,7 @@ jobs:
         with:
           files: app/web-dist.zip
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || needs.prepare.outputs.tag_name }}
-          draft: true
+          draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
