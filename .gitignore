@@ -35,7 +35,6 @@ Thumbs.db
 *.db-shm
 
 # Mobile
-/app/src-tauri/gen/
 *.apk
 *.aab
 *.ipa
