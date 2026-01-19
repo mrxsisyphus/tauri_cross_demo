@@ -1,4 +1,6 @@
 import type { Todo, CreateTodoRequest, UpdateTodoRequest, FilterType, SortType } from '$types';
+import { backendApi } from '../backend';
+import { settingsStore } from './settings.svelte';
 
 // Check if running in Tauri environment
 const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
@@ -9,6 +11,7 @@ let filter = $state<FilterType>('all');
 let sortBy = $state<SortType>('created');
 let searchQuery = $state('');
 let isLoading = $state(false);
+let isSyncing = $state(false);
 
 // Tauri invoke helper
 async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
@@ -77,18 +80,25 @@ function getStats() {
 
 // Actions
 async function loadTodos(): Promise<void> {
-  if (!isTauri) {
-    // Load from localStorage for web
-    const stored = localStorage.getItem('todos');
-    if (stored) {
-      todos = JSON.parse(stored);
-    }
-    return;
-  }
-
+  isLoading = true;
   try {
-    isLoading = true;
-    todos = await invoke<Todo[]>('get_todos');
+    if (!isTauri) {
+      // Load from localStorage for web
+      const stored = localStorage.getItem('todos');
+      if (stored) {
+        todos = JSON.parse(stored);
+      }
+    } else {
+      todos = await invoke<Todo[]>('get_todos');
+    }
+
+    // Try to sync with backend if configured
+    if (settingsStore.isConfigured) {
+      await settingsStore.checkConnection();
+      if (settingsStore.isConnected) {
+        await syncWithBackend();
+      }
+    }
   } catch (error) {
     console.error('Failed to load todos:', error);
   } finally {
@@ -96,12 +106,35 @@ async function loadTodos(): Promise<void> {
   }
 }
 
-async function createTodo(request: CreateTodoRequest): Promise<Todo | undefined> {
-  console.log('todoStore.createTodo called', request);
+async function syncWithBackend(): Promise<void> {
+  if (!settingsStore.isConfigured) return;
+  
+  isSyncing = true;
+  try {
+    const syncResult = await backendApi.syncTodos(todos);
+    if (syncResult) {
+      todos = syncResult.todos;
+      
+      // Update local storage/state
+      if (isTauri) {
+        await invoke('sync_local', { remoteTodos: todos });
+      } else {
+        saveTodosToLocalStorage();
+      }
+    }
+  } catch (error) {
+    console.error('Failed to sync with backend:', error);
+  } finally {
+    isSyncing = false;
+  }
+}
 
+async function createTodo(request: CreateTodoRequest): Promise<Todo | undefined> {
+  let newTodo: Todo | undefined;
+
+  // 1. Create locally
   if (!isTauri) {
-    // Create locally for web
-    const newTodo: Todo = {
+    newTodo = {
       id: crypto.randomUUID(),
       title: request.title,
       description: request.description,
@@ -113,21 +146,43 @@ async function createTodo(request: CreateTodoRequest): Promise<Todo | undefined>
     };
     todos = [newTodo, ...todos];
     saveTodosToLocalStorage();
-    return newTodo;
+  } else {
+    try {
+      newTodo = await invoke<Todo>('create_todo', { request });
+      todos = [newTodo, ...todos];
+    } catch (error) {
+      console.error('Failed to create todo locally:', error);
+    }
   }
 
-  try {
-    const newTodo = await invoke<Todo>('create_todo', { request });
-    todos = [newTodo, ...todos];
-    return newTodo;
-  } catch (error) {
-    console.error('Failed to create todo:', error);
+  // 2. Sync to backend if configured
+  if (newTodo && settingsStore.isConfigured) {
+    try {
+      const remoteTodo = await backendApi.createTodo({
+        ...request,
+        id: newTodo.id
+      });
+      if (remoteTodo) {
+        const index = todos.findIndex((t) => t.id === newTodo?.id);
+        if (index !== -1) {
+          todos[index] = remoteTodo;
+          todos = [...todos];
+        }
+        return remoteTodo;
+      }
+    } catch (error) {
+      console.error('Failed to sync create to backend:', error);
+    }
   }
+
+  return newTodo;
 }
 
 async function updateTodo(id: string, request: UpdateTodoRequest): Promise<Todo | undefined> {
+  let updatedTodo: Todo | undefined;
+
+  // 1. Update locally
   if (!isTauri) {
-    // Update locally for web
     const index = todos.findIndex((t) => t.id === id);
     if (index !== -1) {
       todos[index] = {
@@ -137,74 +192,93 @@ async function updateTodo(id: string, request: UpdateTodoRequest): Promise<Todo 
       };
       todos = [...todos];
       saveTodosToLocalStorage();
-      return todos[index];
+      updatedTodo = todos[index];
     }
-    return;
+  } else {
+    try {
+      updatedTodo = await invoke<Todo>('update_todo', { id, request });
+      const index = todos.findIndex((t) => t.id === id);
+      if (index !== -1) {
+        todos[index] = updatedTodo;
+        todos = [...todos];
+      }
+    } catch (error) {
+      console.error('Failed to update todo locally:', error);
+    }
   }
 
-  try {
-    const updated = await invoke<Todo>('update_todo', { id, request });
-    const index = todos.findIndex((t) => t.id === id);
-    if (index !== -1) {
-      todos[index] = updated;
-      todos = [...todos];
+  // 2. Sync to backend if configured
+  if (settingsStore.isConfigured) {
+    try {
+      const remoteUpdated = await backendApi.updateTodo(id, request);
+      if (remoteUpdated) {
+        const index = todos.findIndex((t) => t.id === id);
+        if (index !== -1) {
+          todos[index] = remoteUpdated;
+          todos = [...todos];
+        }
+        return remoteUpdated;
+      }
+    } catch (error) {
+      console.error('Failed to sync update to backend:', error);
     }
-    return updated;
-  } catch (error) {
-    console.error('Failed to update todo:', error);
   }
+
+  return updatedTodo;
 }
 
 async function toggleTodo(id: string): Promise<void> {
-  if (!isTauri) {
-    const index = todos.findIndex((t) => t.id === id);
-    if (index !== -1) {
-      todos[index].completed = !todos[index].completed;
-      todos[index].updated_at = new Date().toISOString();
-      todos = [...todos];
-      saveTodosToLocalStorage();
-    }
-    return;
-  }
+  const todo = todos.find((t) => t.id === id);
+  if (!todo) return;
 
-  try {
-    const updated = await invoke<Todo>('toggle_todo', { id });
-    const index = todos.findIndex((t) => t.id === id);
-    if (index !== -1) {
-      todos[index] = updated;
-      todos = [...todos];
-    }
-  } catch (error) {
-    console.error('Failed to toggle todo:', error);
-  }
+  const newStatus = !todo.completed;
+  await updateTodo(id, { completed: newStatus });
 }
 
 async function deleteTodo(id: string): Promise<void> {
+  // 1. Delete locally
   if (!isTauri) {
     todos = todos.filter((t) => t.id !== id);
     saveTodosToLocalStorage();
-    return;
+  } else {
+    try {
+      await invoke('delete_todo', { id });
+      todos = todos.filter((t) => t.id !== id);
+    } catch (error) {
+      console.error('Failed to delete todo locally:', error);
+    }
   }
 
-  try {
-    await invoke('delete_todo', { id });
-    todos = todos.filter((t) => t.id !== id);
-  } catch (error) {
-    console.error('Failed to delete todo:', error);
+  // 2. Sync to backend if configured
+  if (settingsStore.isConfigured) {
+    try {
+      await backendApi.deleteTodo(id);
+    } catch (error) {
+      console.error('Failed to sync delete to backend:', error);
+    }
   }
 }
 
 async function clearCompleted(): Promise<void> {
+  const completedIds = todos.filter((t) => t.completed).map((t) => t.id);
+
+  // Local clear
   if (!isTauri) {
     todos = todos.filter((t) => !t.completed);
     saveTodosToLocalStorage();
-    return;
+  } else {
+    try {
+      todos = await invoke<Todo[]>('clear_completed');
+    } catch (error) {
+      console.error('Failed to clear completed locally:', error);
+    }
   }
 
-  try {
-    todos = await invoke<Todo[]>('clear_completed');
-  } catch (error) {
-    console.error('Failed to clear completed:', error);
+  // Backend clear
+  if (settingsStore.isConfigured) {
+    for (const id of completedIds) {
+      await backendApi.deleteTodo(id);
+    }
   }
 }
 
@@ -246,6 +320,9 @@ export const todoStore = {
   get isLoading() {
     return isLoading;
   },
+  get isSyncing() {
+    return isSyncing;
+  },
   get stats() {
     return getStats();
   },
@@ -253,6 +330,7 @@ export const todoStore = {
     return isTauri;
   },
   loadTodos,
+  syncWithBackend,
   createTodo,
   updateTodo,
   toggleTodo,

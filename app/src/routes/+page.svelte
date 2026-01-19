@@ -1,11 +1,12 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import type { Todo } from '$types';
-  import { todoStore } from '$stores';
+  import { todoStore, settingsStore } from '$stores';
   import {
     Header,
     TodoList,
     TodoModal,
+    SettingsModal,
     TodoFilters,
     TodoStats,
     Button
@@ -14,11 +15,16 @@
   import Trash2 from 'lucide-svelte/icons/trash-2';
 
   let isModalOpen = $state(false);
+  let isSettingsOpen = $state(false);
   let editingTodo = $state<Todo | null>(null);
 
   onMount(() => {
     todoStore.loadTodos();
   });
+
+  function handleOpenSettings() {
+    isSettingsOpen = true;
+  }
 
   function handleOpenCreate() {
     editingTodo = null;
@@ -41,7 +47,7 @@
   <meta name="description" content="A beautiful cross-platform todo application built with Tauri 2.0" />
 </svelte:head>
 
-<Header />
+<Header onOpenSettings={handleOpenSettings} />
 
 <main class="container mx-auto px-4 sm:px-6 py-8 max-w-4xl">
   <!-- Stats Section -->
@@ -126,9 +132,39 @@
   onUpdate={(id, request) => todoStore.updateTodo(id, request)}
 />
 
+<SettingsModal
+  isOpen={isSettingsOpen}
+  onClose={() => (isSettingsOpen = false)}
+/>
+
 <!-- Environment indicator -->
-{#if !todoStore.isTauri}
-  <div class="fixed bottom-4 left-4 px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-xs rounded-full border border-yellow-500/30">
-    Web Mode (data stored locally)
-  </div>
-{/if}
+<div class="fixed bottom-4 left-4 flex flex-col gap-2">
+  {#if !todoStore.isTauri}
+    <div class="px-3 py-1.5 bg-yellow-500/10 text-yellow-600 dark:text-yellow-400 text-xs rounded-full border border-yellow-500/30">
+      Web Mode (local storage)
+    </div>
+  {/if}
+  
+  {#if settingsStore.isConfigured}
+    <button 
+      onclick={async () => {
+        await settingsStore.checkConnection();
+        if (settingsStore.isConnected) {
+          await todoStore.syncWithBackend();
+        }
+      }}
+      class="px-3 py-1.5 bg-zinc-500/10 hover:bg-zinc-500/20 transition-colors text-xs rounded-full border border-zinc-500/30 flex items-center gap-2 group"
+    >
+      <div class="w-2 h-2 rounded-full {settingsStore.isConnected ? 'bg-green-500' : 'bg-red-500'} {todoStore.isSyncing ? 'animate-pulse' : ''}"></div>
+      <span class={settingsStore.isConnected ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}>
+        {settingsStore.isConnected ? 'Online' : 'Offline (Server Unreachable)'}
+      </span>
+      <span class="text-zinc-400 opacity-0 group-hover:opacity-100 transition-opacity">Click to retry</span>
+    </button>
+  {:else}
+    <div class="px-3 py-1.5 bg-zinc-500/10 text-zinc-600 dark:text-zinc-400 text-xs rounded-full border border-zinc-500/30 flex items-center gap-2">
+      <div class="w-2 h-2 rounded-full bg-zinc-400"></div>
+      Offline Mode (Local only)
+    </div>
+  {/if}
+</div>

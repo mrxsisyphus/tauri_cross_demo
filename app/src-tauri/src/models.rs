@@ -1,9 +1,10 @@
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use chrono::{DateTime, Utc};
+use sqlx::FromRow;
 
 /// A Todo item
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Todo {
     pub id: String,
     pub title: String,
@@ -32,8 +33,9 @@ impl Todo {
 }
 
 /// Priority level for a todo item
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum Priority {
     Low,
     Medium,

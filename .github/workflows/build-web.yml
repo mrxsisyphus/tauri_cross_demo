@@ -1,0 +1,60 @@
+name: 'Build Web'
+
+on:
+  push:
+    branches:
+      - main
+      - release
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-web:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install frontend dependencies
+        working-directory: ./app
+        run: bun install
+
+      - name: Build for Web
+        working-directory: ./app
+        run: |
+          bun run build
+          cd build && zip -r ../web-dist.zip .
+
+      - name: Upload Web To Release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: app/web-dist.zip
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Web artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-build
+          path: app/build

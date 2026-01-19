@@ -12,6 +12,7 @@ export interface Todo {
 }
 
 export interface CreateTodoRequest {
+  id?: string;
   title: string;
   description?: string;
   priority?: Priority;
@@ -30,6 +31,12 @@ export interface SyncStatus {
   connected: boolean;
   lastSync?: string;
   pendingChanges: number;
+}
+
+export interface AppSettings {
+  backendUrl: string;
+  userId: string;
+  isConnected: boolean;
 }
 
 export type FilterType = 'all' | 'active' | 'completed';

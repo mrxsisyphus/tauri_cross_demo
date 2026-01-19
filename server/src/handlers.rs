@@ -9,8 +9,8 @@ use crate::db::DbPool;
 use crate::models::*;
 
 /// Health check endpoint
-pub async fn health_check() -> &'static str {
-    "OK"
+pub async fn health_check() -> Json<ApiResponse<&'static str>> {
+    Json(ApiResponse::success("OK"))
 }
 
 /// Get all todos for a user
@@ -41,6 +41,9 @@ pub async fn create_todo(
         request.description,
         request.priority.unwrap_or(Priority::Medium),
     );
+    if let Some(id) = request.id {
+        todo.id = id;
+    }
     todo.due_date = request.due_date;
     
     sqlx::query(
@@ -93,7 +96,7 @@ pub async fn update_todo(
         todo.completed = completed;
     }
     if let Some(priority) = request.priority {
-        todo.priority = priority.to_string();
+        todo.priority = priority;
     }
     if let Some(due_date) = request.due_date {
         todo.due_date = Some(due_date);
@@ -149,7 +152,7 @@ pub async fn sync_todos(
     State(pool): State<DbPool>,
     Path(user_id): Path<String>,
     Json(request): Json<SyncRequest>,
-) -> Result<Json<SyncResponse>, StatusCode> {
+) -> Result<Json<ApiResponse<SyncResponse>>, StatusCode> {
     let now = Utc::now();
     
     // Process incoming todos from client
@@ -232,8 +235,8 @@ pub async fn sync_todos(
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?
     };
     
-    Ok(Json(SyncResponse {
+    Ok(Json(ApiResponse::success(SyncResponse {
         todos,
         sync_time: now,
-    }))
+    })))
 }

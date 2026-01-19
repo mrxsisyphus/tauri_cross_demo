@@ -7,11 +7,12 @@ use sqlx::FromRow;
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Todo {
     pub id: String,
+    #[serde(default)]
     pub user_id: String,
     pub title: String,
     pub description: Option<String>,
     pub completed: bool,
-    pub priority: String,
+    pub priority: Priority,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub due_date: Option<DateTime<Utc>>,
@@ -26,7 +27,7 @@ impl Todo {
             title,
             description,
             completed: false,
-            priority: priority.to_string(),
+            priority,
             created_at: now,
             updated_at: now,
             due_date: None,
@@ -35,8 +36,9 @@ impl Todo {
 }
 
 /// Priority level for a todo item
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, sqlx::Type)]
 #[serde(rename_all = "lowercase")]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 pub enum Priority {
     Low,
     Medium,
@@ -75,6 +77,7 @@ impl std::str::FromStr for Priority {
 /// Request to create a new todo
 #[derive(Debug, Deserialize)]
 pub struct CreateTodoRequest {
+    pub id: Option<String>,
     pub title: String,
     pub description: Option<String>,
     pub priority: Option<Priority>,

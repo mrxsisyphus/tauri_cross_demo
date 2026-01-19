@@ -1,0 +1,109 @@
+name: 'Build iOS'
+
+on:
+  push:
+    branches:
+      - main
+      - release
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-ios:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios,x86_64-apple-ios,aarch64-apple-ios-sim
+
+      - name: Install frontend dependencies
+        working-directory: ./app
+        run: bun install
+
+      - name: Build iOS App (Unsigned)
+        working-directory: ./app
+        env:
+          CODE_SIGNING_ALLOWED: "NO"
+          CODE_SIGNING_REQUIRED: "NO"
+          CODE_SIGN_IDENTITY: ""
+          DEVELOPMENT_TEAM: ""
+        run: |
+          # Build the iOS app manually
+          bun run tauri ios build
+      
+      - name: Package App for Distribution
+        run: |
+          mkdir -p ios-artifacts
+          
+          # Find the .app bundle
+          # Common path for Release-iphoneos build
+          APP_PATH=$(find app/src-tauri/gen/apple/build -type d -name "*.app" | grep "Release-iphoneos" | head -n 1)
+          
+          if [ -z "$APP_PATH" ]; then
+            echo "::error::Could not find .app bundle!"
+            # Fallback search anywhere
+            APP_PATH=$(find app/src-tauri/gen/apple/build -type d -name "*.app" | head -n 1)
+          fi
+          
+          if [ -n "$APP_PATH" ]; then
+            echo "Found app at: $APP_PATH"
+            APP_NAME=$(basename "$APP_PATH")
+            
+            # Create a Payload directory (standard IPA structure)
+            mkdir Payload
+            cp -r "$APP_PATH" Payload/
+            
+            # Zip it up as an IPA
+            zip -r "ios-artifacts/todo-app-unsigned.ipa" Payload
+            
+            # Also just zip the .app directly for easier inspection if needed
+            zip -r "ios-artifacts/$APP_NAME.zip" "$APP_PATH"
+            
+            ls -l ios-artifacts/
+          else
+             echo "::error::Could not find any .app bundle to package."
+             exit 1
+          fi
+
+      - name: Upload Artifacts to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ios-artifacts/*.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts to Action Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-app
+          path: ios-artifacts/*
+          if-no-files-found: warn

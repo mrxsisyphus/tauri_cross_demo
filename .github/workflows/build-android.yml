@@ -1,0 +1,102 @@
+name: 'Build Android'
+
+on:
+  push:
+    branches:
+      - main
+      - release
+    tags:
+      - 'v*'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  build-android:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 'lts/*'
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android NDK
+        run: |
+          sdkmanager --install "ndk;27.0.12077973"
+          echo "NDK_HOME=$ANDROID_SDK_ROOT/ndk/27.0.12077973" >> $GITHUB_ENV
+
+      - name: Install dependencies (Linux host)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - name: Install frontend dependencies
+        working-directory: ./app
+        run: bun install
+
+      - name: Build Android APK (Release)
+        working-directory: ./app
+        run: |
+          # Build manually using Tauri CLI
+          bun run tauri android build
+
+      - name: Sign APK (Optional - skipped for now as per instructions implies auto-generated debug/release unsigned or default signing)
+        run: echo "Skipping explicit signing setup, relying on default Gradle behavior"
+
+      - name: Organize Artifacts
+        run: |
+          mkdir -p android-artifacts
+          # Find all APKs generated
+          find app/src-tauri/gen/android/app/build/outputs/apk -name "*.apk" -exec cp {} android-artifacts/ \;
+          ls -R android-artifacts
+
+      - name: Upload Artifacts to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: android-artifacts/*.apk
+          # softprops defaults: if tag exists, it uploads to it. If it doesn't, it creates it.
+          # Since build-desktop is also running, we rely on concurrency handling or one of them creating it.
+          # softprops/action-gh-release handles appending well.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload Artifacts to Action Run
+        uses: actions/upload-artifact@v4
+        with:
+          name: android-apk
+          path: android-artifacts/*.apk
+          if-no-files-found: warn

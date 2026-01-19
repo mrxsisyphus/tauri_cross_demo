@@ -2,7 +2,10 @@
   import { Button } from '$components/ui';
   import Sun from 'lucide-svelte/icons/sun';
   import Moon from 'lucide-svelte/icons/moon';
+  import Settings from 'lucide-svelte/icons/settings';
   import CheckSquare from 'lucide-svelte/icons/check-square';
+
+  let { onOpenSettings } = $props<{ onOpenSettings?: () => void }>();
 
   let isDark = $state(false);
 
@@ -56,6 +59,13 @@
         {/if}
         <span class="sr-only">Toggle theme</span>
       </Button>
+
+      {#if onOpenSettings}
+        <Button variant="ghost" size="icon" onclick={onOpenSettings}>
+          <Settings class="w-5 h-5" />
+          <span class="sr-only">Settings</span>
+        </Button>
+      {/if}
     </div>
   </div>
 </header>

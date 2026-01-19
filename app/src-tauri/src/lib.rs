@@ -1,5 +1,6 @@
 mod commands;
 mod models;
+mod db;
 
 pub use commands::*;
 pub use models::*;
@@ -26,8 +27,11 @@ pub fn run() {
         .plugin(tauri_plugin_os::init())
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            // Initialize app state
-            app.manage(AppState::default());
+            let handle = app.handle().clone();
+            tauri::async_runtime::block_on(async move {
+                let db_pool = db::init_db(&handle).await.expect("failed to initialize database");
+                handle.manage(AppState { db: db_pool });
+            });
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -36,6 +40,7 @@ pub fn run() {
             update_todo,
             toggle_todo,
             delete_todo,
+            sync_local,
             clear_completed,
         ])
         .run(tauri::generate_context!())
