@@ -1,12 +1,11 @@
-name: 'Build Web'
+name: "Build Web"
 
 on:
   push:
     branches:
-      - main
       - release
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
     branches:
       - main

@@ -3,7 +3,6 @@ name: "Build iOS"
 on:
   push:
     branches:
-      - main
       - release
     tags:
       - "v*"
@@ -50,6 +49,9 @@ jobs:
 
       - name: Build iOS App (Unsigned)
         working-directory: ./app
+        env:
+          APPLE_DEVELOPMENT_TEAM: "TEAMID12347"
+          TAURI_APPLE_DEVELOPMENT_TEAM: "TEAMID12347"
         run: |
           # 1. --ci : 跳过交互式询问
           # 2. --target aarch64 : 编真机版
@@ -63,7 +65,6 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_IDENTITY="" \
             PROVISIONING_PROFILE="" \
-            DEVELOPMENT_TEAM="" \
             AD_HOC_CODE_SIGNING_ALLOWED=YES
 
       - name: Package App for Distribution

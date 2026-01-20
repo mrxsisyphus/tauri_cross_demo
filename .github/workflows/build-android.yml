@@ -3,7 +3,6 @@ name: "Build Android"
 on:
   push:
     branches:
-      - main
       - release
     tags:
       - "v*"
@@ -82,7 +81,8 @@ jobs:
           alias: ${{ secrets.ANDROID_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-        continue-on-error: true # Allow building to proceed even if signing fails (e.g. secrets not set)
+          buildToolsVersion: "34.0.0" # Specify a modern version available on ubuntu-latest
+        continue-on-error: true
 
       - name: Organize Artifacts
         run: |
@@ -92,10 +92,11 @@ jobs:
             cp app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*-signed.apk android-artifacts/
           fi
           # Also grab the universal unsigned one just in case
-          find app/src-tauri/gen/android/app/build/outputs/apk -name "*universal-release-unsigned.apk" -exec cp {} android-artifacts/ \;
-          ls -R android-artifacts
+          find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*universal-release-unsigned.apk" -exec cp {} android-artifacts/ \;
+          ls -l android-artifacts
 
       - name: Upload Artifacts to Release
+        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: android-artifacts/*.apk
