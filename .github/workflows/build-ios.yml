@@ -52,11 +52,11 @@ jobs:
         working-directory: ./app
         run: |
           # 重点：
-          # 1. --target aarch64-apple-ios : 明确告诉它我们要编真机版(arm64)，不是模拟器
+          # 1. --target aarch64 : 明确告诉它我们要编真机版(arm64)，不是模拟器
           # 2. -- (双横杠) : 把后面的参数透传给 xcodebuild
           # 3. CODE_SIGNING_ALLOWED=NO : 强行关掉签名
           
-          bun tauri ios build --target aarch64-apple-ios -- \
+          bun tauri ios build --target aarch64 -- \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGNING_IDENTITY="" \
