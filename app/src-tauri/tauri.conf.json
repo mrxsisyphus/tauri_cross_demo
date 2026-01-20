@@ -55,9 +55,6 @@
     },
     "iOS": {
       "developmentTeam": "TEAMID12347"
-    },
-    "apple": {
-      "developmentTeam": "TEAMID12347"
     }
   },
   "plugins": {
