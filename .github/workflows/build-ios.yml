@@ -50,48 +50,53 @@ jobs:
 
       - name: Build iOS App (Unsigned)
         working-directory: ./app
-        env:
-          CODE_SIGNING_ALLOWED: "NO"
-          CODE_SIGNING_REQUIRED: "NO"
-          CODE_SIGN_IDENTITY: ""
-          DEVELOPMENT_TEAM: ""
         run: |
-          # Build the iOS app manually
-          bun run tauri ios build
+          # 重点：
+          # 1. --target aarch64-apple-ios : 明确告诉它我们要编真机版(arm64)，不是模拟器
+          # 2. -- (双横杠) : 把后面的参数透传给 xcodebuild
+          # 3. CODE_SIGNING_ALLOWED=NO : 强行关掉签名
+          
+          bun tauri ios build --target aarch64-apple-ios -- \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_IDENTITY="" \
+            PROVISIONING_PROFILE=""
+
       
       - name: Package App for Distribution
         run: |
           mkdir -p ios-artifacts
           
-          # Find the .app bundle
-          # Common path for Release-iphoneos build
-          APP_PATH=$(find app/src-tauri/gen/apple/build -type d -name "*.app" | grep "Release-iphoneos" | head -n 1)
+          echo "Searching for .app bundle..."
+          # 稍微放宽搜索条件，防止因为路径变动找不到
+          # 排除掉模拟器(iphonesimulator)的包，只找真机(iphoneos)的包
+          APP_PATH=$(find app/src-tauri/gen/apple/build -type d -name "*.app" | grep -v "iphonesimulator" | head -n 1)
           
           if [ -z "$APP_PATH" ]; then
-            echo "::error::Could not find .app bundle!"
-            # Fallback search anywhere
-            APP_PATH=$(find app/src-tauri/gen/apple/build -type d -name "*.app" | head -n 1)
+            echo "::error::Could not find .app bundle! Check build logs."
+            find app/src-tauri/gen/apple/build -type d -name "*.app" # 打印出来看看都在哪
+            exit 1
           fi
           
-          if [ -n "$APP_PATH" ]; then
-            echo "Found app at: $APP_PATH"
-            APP_NAME=$(basename "$APP_PATH")
-            
-            # Create a Payload directory (standard IPA structure)
-            mkdir Payload
-            cp -r "$APP_PATH" Payload/
-            
-            # Zip it up as an IPA
-            zip -r "ios-artifacts/todo-app-unsigned.ipa" Payload
-            
-            # Also just zip the .app directly for easier inspection if needed
-            zip -r "ios-artifacts/$APP_NAME.zip" "$APP_PATH"
-            
-            ls -l ios-artifacts/
-          else
-             echo "::error::Could not find any .app bundle to package."
-             exit 1
-          fi
+          echo "Found app at: $APP_PATH"
+          
+          # 创建 Payload 文件夹 (这是 IPA 的标准结构)
+          rm -rf Payload
+          mkdir Payload
+          
+          # 复制 .app 进去
+          cp -r "$APP_PATH" Payload/
+          
+          # 压缩成 IPA
+          zip -r "ios-artifacts/todo-app-unsigned.ipa" Payload
+          
+          # 顺便把 .app 也压个包，万一你要用模拟器测
+          APP_NAME=$(basename "$APP_PATH")
+          zip -r "ios-artifacts/$APP_NAME.zip" "$APP_PATH"
+          
+          echo "Packaging done:"
+          ls -l ios-artifacts/
+
 
       - name: Upload Artifacts to Release
         if: startsWith(github.ref, 'refs/tags/')
