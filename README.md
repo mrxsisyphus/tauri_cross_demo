@@ -1,97 +1,77 @@
-# Tauri Cross-Platform Todo Demo
+# 🚀 Tauri Cross-Platform Todo Demo
 
-A cross-platform todo application demonstrating Tauri 2.0's capabilities across Windows, macOS, Linux, Android, iOS, and Web platforms.
+[![MIT License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Tauri](https://img.shields.io/badge/Tauri-2.0-blue?logo=tauri)](https://tauri.app/)
+[![Svelte](https://img.shields.io/badge/Svelte-5.0-ff3e00?logo=svelte)](https://svelte.dev/)
+[![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.0-38bdf8?logo=tailwind-css)](https://tailwindcss.com/)
 
-## Tech Stack
+A premium, state-of-the-art cross-platform todo application demonstrating the power of **Tauri 2.0**. This demo showcases a single codebase running seamlessly across **Windows, macOS, Linux, Android, iOS, and Web**.
+
+## ✨ Key Features
+
+- **📱 True Cross-Platform**: One frontend, multiple native targets.
+- **⚡ High Performance**: Ultra-lightweight Rust backend with a fast Svelte 5 frontend.
+- **🎨 Modern UI/UX**: Built with Svelte 5 (Runes), Tailwind CSS v4, and shadcn-svelte for a premium look and feel.
+- **🔄 Real-time Sync**: Includes a dedicated Axum-based Rust server for data synchronization.
+- **📦 Local-first**: Robust local storage and state management.
+
+## 🛠 Tech Stack
 
 ### Frontend
-- **Svelte 5** with Runes
-- **SvelteKit** (SPA mode)
-- **Tailwind CSS v4**
-- **shadcn-svelte** for UI components
-- **TypeScript**
-- **Vite** + **Bun** for development
 
-### Backend
-- **Rust** with Cargo Workspace
-- **Tauri 2.0** for desktop/mobile apps
-- **Axum** for sync server
+- **Framework**: [Svelte 5](https://svelte.dev/) (utilizing the latest Runes API)
+- **Styling**: [Tailwind CSS v3.4](https://tailwindcss.com/) & [shadcn-svelte](https://shadcn-svelte.com/)
+- **Runtime**: [Bun](https://bun.sh/) for lightning-fast development
 
-## Project Structure
+### Backend & Native
 
-```
+- **Framework**: [Tauri 2.0](https://tauri.app/)
+- **Logic**: Rust (Workspace-based architecture)
+- **API**: [Axum](https://github.com/tokio-rs/axum) for the sync server
+- **Database**: SQLite with `sqlx`
+
+## 📁 Project Structure
+
+```text
 tauri_cross_demo/
-├── app/                          # Frontend + Tauri app
-│   ├── src/                      # SvelteKit source
-│   │   ├── lib/                  # Shared components and utilities
-│   │   │   ├── components/       # UI components
-│   │   │   ├── stores/           # Svelte stores
-│   │   │   └── types/            # TypeScript types
-│   │   └── routes/               # SvelteKit routes
-│   ├── src-tauri/                # Tauri Rust backend
-│   │   └── src/                  # Rust source code
-│   ├── static/                   # Static assets
-│   ├── package.json
-│   ├── svelte.config.js
-│   ├── vite.config.ts
-│   └── tailwind.config.ts
-├── server/                       # Axum sync server
-│   └── src/                      # Server source code
-├── .github/
-│   └── workflows/                # GitHub Actions
-├── Cargo.toml                    # Workspace root
+├── app/                  # Frontend + Tauri Mobile/Desktop wrappers
+│   ├── src/              # SvelteKit source (Runes)
+│   ├── src-tauri/        # Tauri Rust core
+│   └── static/           # Static assets
+├── server/               # Axum sync server logic
+├── .github/workflows/    # CI/CD (Android, iOS, Desktop builds)
+├── Cargo.toml            # Root workspace configuration
 └── README.md
 ```
 
-## Prerequisites
+## 🚀 Quick Start
+
+### Prerequisites
 
 - [Rust](https://rustup.rs/) (latest stable)
-- [Bun](https://bun.sh/) (v1.0+)
+- [Bun](https://bun.sh/)
 - [Tauri CLI](https://tauri.app/v1/guides/getting-started/prerequisites)
 
-For mobile development:
-- **Android**: Android Studio, Android SDK, NDK
-- **iOS**: Xcode (macOS only)
-
-## Getting Started
-
-### 1. Install Dependencies
+### 1. Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/mrxsisyphus/tauri_cross_demo.git
+cd tauri_cross_demo
+
 # Install frontend dependencies
 cd app
 bun install
-
-# Install Rust dependencies (handled by cargo)
-cd ..
-cargo build
 ```
 
 ### 2. Development
 
-#### Desktop Development
-```bash
-cd app
-bun run tauri:dev
-```
-
-#### Web Development
-```bash
-cd app
-bun run dev
-```
-
-#### Android Development
-```bash
-cd app
-bun run tauri android dev
-```
-
-#### iOS Development (macOS only)
-```bash
-cd app
-bun run tauri ios dev
-```
+| Target      | Command (run inside `app/`) |
+| :---------- | :-------------------------- |
+| **Desktop** | `bun run tauri:dev`         |
+| **Web**     | `bun run dev`               |
+| **Android** | `bun run tauri android dev` |
+| **iOS**     | `bun run tauri ios dev`     |
 
 ### 3. Sync Server
 
@@ -100,36 +80,24 @@ cd server
 cargo run
 ```
 
-The server runs on `http://localhost:3001`
+The server will be available at `http://localhost:3001`.
 
-## Building for Production
+## 📦 Build & Release
 
-### Desktop
+We use GitHub Actions to automate the build process for all platforms. Artifacts are automatically attached to GitHub Releases.
+
 ```bash
-cd app
-bun run tauri build
-```
-
-### Android
-```bash
+# Example: Build for Android
 cd app
 bun run tauri android build
 ```
 
-### iOS
-```bash
-cd app
-bun run tauri ios build
-```
+## 📄 License
 
-## GitHub Actions
+Distributed under the MIT License. See `LICENSE` for more information.
 
-The project includes GitHub Actions workflows for:
-- Cross-platform builds (Windows, macOS, Linux)
-- Android APK builds
-- iOS IPA builds (requires macOS runner)
-- Automatic release creation
+---
 
-## License
-
-MIT
+<p align="center">
+  Built with ❤️ by <a href="https://github.com/mrxsisyphus">mrx_sisyphus</a>
+</p>

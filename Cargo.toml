@@ -5,9 +5,9 @@ members = ["app/src-tauri", "server"]
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
-authors = ["Your Name <your.email@example.com>"]
+authors = ["mrx_sisyphus"]
 license = "MIT"
-repository = "https://github.com/yourusername/tauri_cross_demo"
+repository = "https://github.com/mrxsisyphus/tauri_cross_demo"
 
 [workspace.dependencies]
 # Common dependencies
@@ -27,4 +27,9 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 # Database
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "uuid", "chrono"] }
+sqlx = { version = "0.8", features = [
+    "runtime-tokio",
+    "sqlite",
+    "uuid",
+    "chrono",
+] }

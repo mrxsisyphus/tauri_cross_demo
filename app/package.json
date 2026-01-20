@@ -1,7 +1,9 @@
 {
   "name": "todo-cross-app",
   "version": "0.1.0",
-  "private": true,
+  "license": "MIT",
+  "author": "mrx_sisyphus",
+  "private": false,
   "type": "module",
   "scripts": {
     "dev": "vite dev",
