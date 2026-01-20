@@ -7,7 +7,7 @@
   },
   "bundle": {
     "iOS": {
-      "developmentTeam": "YOUR_TEAM_ID"
+      "developmentTeam": ""
     }
   }
 }

@@ -77,7 +77,7 @@ jobs:
         uses: r0adkll/sign-android-release@v1
         id: sign_app
         with:
-          releaseDirectory: app/src-tauri/gen/android/app/build/outputs/apk/release
+          releaseDirectory: app/src-tauri/gen/android/app/build/outputs/apk/universal/release
           signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
           alias: ${{ secrets.ANDROID_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
@@ -88,8 +88,8 @@ jobs:
         run: |
           mkdir -p android-artifacts
           # Prefer signed APKs if they exist
-          if ls app/src-tauri/gen/android/app/build/outputs/apk/release/*-signed.apk 1> /dev/null 2>&1; then
-            cp app/src-tauri/gen/android/app/build/outputs/apk/release/*-signed.apk android-artifacts/
+          if ls app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*-signed.apk 1> /dev/null 2>&1; then
+            cp app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*-signed.apk android-artifacts/
           fi
           # Also grab the universal unsigned one just in case
           find app/src-tauri/gen/android/app/build/outputs/apk -name "*universal-release-unsigned.apk" -exec cp {} android-artifacts/ \;
