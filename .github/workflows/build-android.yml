@@ -73,7 +73,7 @@ jobs:
           bun run tauri android build
 
       - name: Sign APK
-        uses: r0adkll/sign-android-release@v1
+        uses: ilharp/sign-android-release@v1
         id: sign_app
         with:
           releaseDirectory: app/src-tauri/gen/android/app/build/outputs/apk/universal/release
@@ -81,8 +81,7 @@ jobs:
           alias: ${{ secrets.ANDROID_ALIAS }}
           keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
           keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          buildToolsVersion: "34.0.0" # Specify a modern version available on ubuntu-latest
-        continue-on-error: true
+          buildToolsVersion: "34.0.0"
 
       - name: Organize Artifacts
         run: |
