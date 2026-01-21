@@ -89,27 +89,36 @@ jobs:
         shell: bash
         run: |
           TAG_NAME="${{ github.ref_name }}"
-          # Determine Architecture Name
-          if [ -n "${{ matrix.target }}" ]; then
-            ARCH_NAME="${{ matrix.target }}"
-          elif [ "${{ matrix.platform }}" == "ubuntu-22.04" ]; then
+          PLATFORM="${{ matrix.platform }}"
+          TARGET="${{ matrix.target }}"
+
+          if [ -n "$TARGET" ]; then
+            ARCH_NAME="$TARGET"
+          elif [ "$PLATFORM" == "ubuntu-22.04" ]; then
             ARCH_NAME="amd64"
-          elif [ "${{ matrix.platform }}" == "windows-latest" ]; then
+          elif [ "$PLATFORM" == "windows-latest" ]; then
             ARCH_NAME="x64"
           else
             ARCH_NAME="universal"
           fi
 
-          echo "Renaming artifacts for $ARCH_NAME..."
+          echo "Renaming artifacts for ARCH: $ARCH_NAME, TAG: $TAG_NAME"
 
-          # Find and rename files in target directory
-          # Focus on final bundles
-          find app/src-tauri/target -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while read FILE; do
-            EXT="${FILE##*.}"
-            DIR=$(dirname "$FILE")
-            NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
-            echo "Renaming $FILE to $DIR/$NEW_NAME"
-            mv "$FILE" "$DIR/$NEW_NAME"
+          # 确保目标目录存在，防止 find 报错
+          if [ ! -d "app/src-tauri/target" ]; then
+            echo "Directory app/src-tauri/target not found, skipping rename."
+            exit 0
+          fi
+
+          # 使用 IFS= read -r 处理带空格的文件名
+          find app/src-tauri/target -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while IFS= read -r FILE; do
+            if [ -f "$FILE" ]; then
+              EXT="${FILE##*.}"
+              DIR=$(dirname "$FILE")
+              NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
+              echo "Renaming \"$FILE\" to \"$DIR/$NEW_NAME\""
+              mv "$FILE" "$DIR/$NEW_NAME"
+            fi
           done
 
           # Handle .app.tar.gz if it exists or create it?
