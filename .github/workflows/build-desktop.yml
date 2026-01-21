@@ -103,15 +103,30 @@ jobs:
           fi
 
           echo "Renaming artifacts for ARCH: $ARCH_NAME, TAG: $TAG_NAME"
+          echo "Current working directory: $(pwd)"
 
-          # 确保目标目录存在，防止 find 报错
-          if [ ! -d "app/src-tauri/target" ]; then
-            echo "Directory app/src-tauri/target not found, skipping rename."
-            exit 0
+          TARGET_DIR="app/src-tauri/target"
+
+          # 确保目标目录存在，如果不存在则尝试搜索
+          if [ ! -d "$TARGET_DIR" ]; then
+            echo "Directory $TARGET_DIR not found. Searching for 'target' directory..."
+            # 排除 node_modules 以防万一
+            FOUND_TARGET=$(find . -type d -name "target" -not -path "*/node_modules/*" | head -n 1)
+            
+            if [ -n "$FOUND_TARGET" ]; then
+                echo "Found target directory at: $FOUND_TARGET"
+                TARGET_DIR="$FOUND_TARGET"
+            else
+                echo "Target directory not found. Debugging structure:"
+                ls -R app || echo "Cannot list app directory"
+                exit 1
+            fi
           fi
 
+          echo "Using Target Directory: $TARGET_DIR"
+
           # 使用 IFS= read -r 处理带空格的文件名
-          find app/src-tauri/target -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while IFS= read -r FILE; do
+          find "$TARGET_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while IFS= read -r FILE; do
             if [ -f "$FILE" ]; then
               EXT="${FILE##*.}"
               DIR=$(dirname "$FILE")
