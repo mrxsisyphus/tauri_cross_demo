@@ -72,16 +72,43 @@ jobs:
           # Build manually using Tauri CLI
           bun run tauri android build
 
-      - name: Sign APK
-        uses: ilharp/sign-android-release@v1
+      - name: Sign APK (Manual)
         id: sign_app
-        with:
-          releaseDirectory: app/src-tauri/gen/android/app/build/outputs/apk/universal/release
-          signingKeyBase64: ${{ secrets.ANDROID_SIGNING_KEY }}
-          alias: ${{ secrets.ANDROID_ALIAS }}
-          keyStorePassword: ${{ secrets.ANDROID_KEY_STORE_PASSWORD }}
-          keyPassword: ${{ secrets.ANDROID_KEY_PASSWORD }}
-          buildToolsVersion: "34.0.0"
+        run: |
+          # 1. 找到对应的 Build Tools 路径 (使用最新的)
+          BUILD_TOOLS_VERSION="34.0.0"
+          ANDROID_BUILD_TOOLS="$ANDROID_SDK_ROOT/build-tools/$BUILD_TOOLS_VERSION"
+
+          # 确保工具存在，如果不存在则自动查找最新版
+          if [ ! -d "$ANDROID_BUILD_TOOLS" ]; then
+            echo "Build tools $BUILD_TOOLS_VERSION not found, finding latest..."
+            ANDROID_BUILD_TOOLS=$(ls -d $ANDROID_SDK_ROOT/build-tools/* | sort -V | tail -n1)
+          fi
+          echo "Using Build Tools: $ANDROID_BUILD_TOOLS"
+
+          # 定义路径变量
+          RELEASE_DIR="app/src-tauri/gen/android/app/build/outputs/apk/universal/release"
+          UNSIGNED_APK=$(find $RELEASE_DIR -name "*universal-release-unsigned.apk" | head -n 1)
+          ALIGNED_APK="$RELEASE_DIR/app-universal-release-aligned.apk"
+          SIGNED_APK="$RELEASE_DIR/app-universal-release-signed.apk"
+
+          echo "Found Unsigned APK: $UNSIGNED_APK"
+
+          # 2. Decode Signing Key
+          echo "${{ secrets.ANDROID_SIGNING_KEY }}" | base64 --decode > release.jks
+
+          # 3. Zipalign (优化对齐)
+          "$ANDROID_BUILD_TOOLS/zipalign" -v -p 4 "$UNSIGNED_APK" "$ALIGNED_APK"
+
+          # 4. Apksigner (签名)
+          "$ANDROID_BUILD_TOOLS/apksigner" sign --ks release.jks \
+            --ks-key-alias "${{ secrets.ANDROID_ALIAS }}" \
+            --ks-pass "pass:${{ secrets.ANDROID_KEY_STORE_PASSWORD }}" \
+            --key-pass "pass:${{ secrets.ANDROID_KEY_PASSWORD }}" \
+            --out "$SIGNED_APK" "$ALIGNED_APK"
+
+          # 清理 Key 文件
+          rm release.jks
 
       - name: Organize Artifacts
         run: |
