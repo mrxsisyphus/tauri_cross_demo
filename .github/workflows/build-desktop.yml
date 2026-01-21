@@ -113,16 +113,29 @@ jobs:
             exit 0
           fi
 
+          # 调试：列出所有 target 目录
+          echo "=== Debug: Listing target directories ==="
+          find "$BASE_DIR" -maxdepth 2 -type d -name "release" -o -name "debug" | head -20
+          
+          # 调试：列出所有 bundle 目录
+          echo "=== Debug: Listing bundle directories ==="
+          find "$BASE_DIR" -type d -name "bundle" | head -20
+
           # 查找所有 bundle 子目录中的安装包
           # Windows: bundle/msi/*.msi, bundle/nsis/*.exe
           # macOS: bundle/dmg/*.dmg, bundle/macos/*.app (will be tar'd separately)
           # Linux: bundle/deb/*.deb, bundle/rpm/*.rpm, bundle/appimage/*.AppImage
 
           FOUND_FILES=0
-          find "$BASE_DIR" -type d -name "bundle" | while IFS= read -r BUNDLE_DIR; do
+          # 使用 process substitution 避免子shell问题
+          while IFS= read -r BUNDLE_DIR; do
             echo "Searching in bundle directory: $BUNDLE_DIR"
             
-            find "$BUNDLE_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while IFS= read -r FILE; do
+            # 调试：列出该 bundle 目录下的所有文件
+            echo "Files in $BUNDLE_DIR:"
+            find "$BUNDLE_DIR" -type f | head -20 || true
+            
+            while IFS= read -r FILE; do
               if [ -f "$FILE" ]; then
                 FOUND_FILES=1
                 EXT="${FILE##*.}"
@@ -130,18 +143,35 @@ jobs:
                 BASENAME=$(basename "$FILE")
                 NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
                 
+                echo "Found file: $BASENAME"
                 echo "Renaming \"$BASENAME\" to \"$NEW_NAME\""
                 mv "$FILE" "$DIR/$NEW_NAME"
+                echo "Renamed successfully: $DIR/$NEW_NAME"
               fi
-            done
-          done
+            done < <(find "$BUNDLE_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \))
+          done < <(find "$BASE_DIR" -type d -name "bundle")
 
-          echo "Rename completed."
+          if [ "$FOUND_FILES" -eq 0 ]; then
+            echo "Warning: No bundle files found to rename!"
+            echo "Listing all files in target directory for debugging:"
+            find "$BASE_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | head -20 || true
+          else
+            echo "Rename completed. Found and renamed $FOUND_FILES file(s)."
+          fi
 
           # Handle .app.tar.gz if it exists or create it?
           # Tauri action might not create tar.gz automatically if we disabled release? 
           # Actually tauri-action usually creates tar.gz for updater if configured.
           # Let's just stick to the main bundles for now.
+
+      - name: List Artifacts for Upload
+        shell: bash
+        run: |
+          echo "=== Listing renamed artifacts ==="
+          find app/src-tauri/target -type f -name "todo_cross-*" || echo "No todo_cross-* files found"
+          echo ""
+          echo "=== Listing all bundle files ==="
+          find app/src-tauri/target -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) || echo "No bundle files found"
 
       - name: Upload Artifacts to Release
         if: startsWith(github.ref, 'refs/tags/')
