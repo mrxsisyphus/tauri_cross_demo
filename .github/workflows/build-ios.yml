@@ -49,14 +49,13 @@ jobs:
           bun tauri build --no-bundle
           bun tauri ios init
 
-      # 4. 手动调用 xcodebuild 进行归档
+      # 4. 用 xcodebuild 直接 build（不 archive），避免必须要 provisioning profile
       # 解释参数：
-      # - CODE_SIGNING_ALLOWED="YES": 必须开启，否则无法嵌入权限
-      # - CODE_SIGNING_REQUIRED="YES": 同上
-      # - CODE_SIGNING_IDENTITY="-": 关键！这代表 "Ad-Hoc Sign"，不需要证书
-      # - AD_HOC_CODE_SIGNING_ALLOWED="YES": 允许伪签名
+      # - CODE_SIGNING_ALLOWED="NO": 不进行签名
+      # - CODE_SIGNING_REQUIRED="NO": 不强制签名
+      # - CODE_SIGNING_IDENTITY="": 清空签名身份
       # 用 find 命令找到 .xcodeproj，适应 tauri v1 或 v2 的路径差异
-      - name: Xcode Archive (Ad-Hoc)
+      - name: Xcode Build (Unsigned)
         run: |
           cd app/src-tauri/gen/apple
 
@@ -77,19 +76,29 @@ jobs:
           echo "Found Project: $XCODE_PROJECT"
           echo "Building Scheme: $SCHEME_NAME"
 
-          xcodebuild archive \
+          DERIVED_DATA="$(pwd)/dist/derived"
+
+          xcodebuild build \
             -project "$XCODE_PROJECT" \
             -scheme "$SCHEME_NAME" \
             -configuration Release \
             -destination "generic/platform=iOS" \
-            -archivePath "dist/$SCHEME_NAME.xcarchive" \
-            CODE_SIGNING_ALLOWED="YES" \
-            CODE_SIGNING_REQUIRED="YES" \
+            -derivedDataPath "$DERIVED_DATA" \
+            CODE_SIGNING_ALLOWED="NO" \
+            CODE_SIGNING_REQUIRED="NO" \
             CODE_SIGN_STYLE="Manual" \
-            CODE_SIGNING_IDENTITY="-" \
+            CODE_SIGNING_IDENTITY="" \
             DEVELOPMENT_TEAM="" \
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE=""
+
+          APP_PATH=$(find "$DERIVED_DATA/Build/Products" -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Error: Could not find built .app in $DERIVED_DATA"
+            exit 1
+          fi
+
+          echo "APP_PATH=$APP_PATH" >> "$GITHUB_ENV"
 
       # 5. 手动打包成 IPA (Payload 法)
       # 这生成出来的包，就是用户可以用轻松签、爱思助手重签名的包
@@ -97,22 +106,27 @@ jobs:
         run: |
           cd app/src-tauri/gen/apple/dist
 
-          # 找到刚才生成的 xcarchive
-          ARCHIVE_PATH=$(find . -name "*.xcarchive" | head -n 1)
-          APP_PATH="$ARCHIVE_PATH/Products/Applications"
-          APP_NAME=$(ls "$APP_PATH" | head -n 1)
-
           mkdir Payload
-          cp -r "$APP_PATH/$APP_NAME" Payload/
+          cp -r "$APP_PATH" Payload/
 
           # 压缩生成 IPA
-          zip -r app-unsigned.ipa Payload
+          TAG_NAME="${{ github.ref_name }}"
+          IPA_NAME="todo_cross-${TAG_NAME}-ios-unsigned.ipa"
+          zip -r "$IPA_NAME" Payload
 
-          echo "IPA Created at $(pwd)/app-unsigned.ipa"
+          echo "IPA Created at $(pwd)/$IPA_NAME"
 
       # 6. 上传 Artifact (给用户下载)
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: unsigned-ipa
-          path: app/src-tauri/gen/apple/dist/app-unsigned.ipa
+          path: app/src-tauri/gen/apple/dist/todo_cross-*-ios-unsigned.ipa
+
+      - name: Upload IPA to Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: app/src-tauri/gen/apple/dist/todo_cross-*-ios-unsigned.ipa
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

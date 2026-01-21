@@ -41,13 +41,14 @@ jobs:
         working-directory: ./app
         run: |
           bun run build
-          cd build && zip -r ../web-dist.zip .
+          TAG_NAME="${{ github.ref_name }}"
+          cd build && zip -r "../todo_cross-${TAG_NAME}-web.zip" .
 
       - name: Upload Web To Release
         uses: softprops/action-gh-release@v2
         if: startsWith(github.ref, 'refs/tags/')
         with:
-          files: app/web-dist.zip
+          files: app/todo_cross-*-web.zip
           draft: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

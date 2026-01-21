@@ -110,16 +110,23 @@ jobs:
           # 清理 Key 文件
           rm release.jks
 
-      - name: Organize Artifacts
+      - name: Organize & Rename Artifacts
         run: |
           mkdir -p android-artifacts
+          TAG_NAME="${{ github.ref_name }}"
+          # Clean tag name just in case (though usually safe)
+
           # Prefer signed APKs if they exist
           if ls app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*-signed.apk 1> /dev/null 2>&1; then
-            cp app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*-signed.apk android-artifacts/
+            cp app/src-tauri/gen/android/app/build/outputs/apk/universal/release/*-signed.apk "android-artifacts/todo_cross-${TAG_NAME}-android-universal.apk"
+          else
+            # Also grab the universal unsigned one just in case
+            # find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*universal-release-unsigned.apk" -exec cp {} android-artifacts/ \;
+            # If we get here, likely something wrong with signing, but let's copy unsigned with name
+             find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*universal-release-unsigned.apk" -exec cp {} "android-artifacts/todo_cross-${TAG_NAME}-android-universal-unsigned.apk" \;
           fi
-          # Also grab the universal unsigned one just in case
-          find app/src-tauri/gen/android/app/build/outputs/apk/universal/release -name "*universal-release-unsigned.apk" -exec cp {} android-artifacts/ \;
-          ls -l android-artifacts
+
+          ls -l android-artifacts/
 
       - name: Upload Artifacts to Release
         if: startsWith(github.ref, 'refs/tags/')
