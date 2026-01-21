@@ -103,38 +103,40 @@ jobs:
           fi
 
           echo "Renaming artifacts for ARCH: $ARCH_NAME, TAG: $TAG_NAME"
-          echo "Current working directory: $(pwd)"
 
-          TARGET_DIR="app/src-tauri/target"
+          # 只在 bundle 目录中查找最终的安装包
+          # 这样可以避免重命名中间构建文件
+          BASE_DIR="app/src-tauri/target"
 
-          # 确保目标目录存在，如果不存在则尝试搜索
-          if [ ! -d "$TARGET_DIR" ]; then
-            echo "Directory $TARGET_DIR not found. Searching for 'target' directory..."
-            # 排除 node_modules 以防万一
-            FOUND_TARGET=$(find . -type d -name "target" -not -path "*/node_modules/*" | head -n 1)
-            
-            if [ -n "$FOUND_TARGET" ]; then
-                echo "Found target directory at: $FOUND_TARGET"
-                TARGET_DIR="$FOUND_TARGET"
-            else
-                echo "Target directory not found. Debugging structure:"
-                ls -R app || echo "Cannot list app directory"
-                exit 1
-            fi
+          if [ ! -d "$BASE_DIR" ]; then
+            echo "Warning: Directory $BASE_DIR not found, skipping rename."
+            exit 0
           fi
 
-          echo "Using Target Directory: $TARGET_DIR"
+          # 查找所有 bundle 子目录中的安装包
+          # Windows: bundle/msi/*.msi, bundle/nsis/*.exe
+          # macOS: bundle/dmg/*.dmg, bundle/macos/*.app (will be tar'd separately)
+          # Linux: bundle/deb/*.deb, bundle/rpm/*.rpm, bundle/appimage/*.AppImage
 
-          # 使用 IFS= read -r 处理带空格的文件名
-          find "$TARGET_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while IFS= read -r FILE; do
-            if [ -f "$FILE" ]; then
-              EXT="${FILE##*.}"
-              DIR=$(dirname "$FILE")
-              NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
-              echo "Renaming \"$FILE\" to \"$DIR/$NEW_NAME\""
-              mv "$FILE" "$DIR/$NEW_NAME"
-            fi
+          FOUND_FILES=0
+          find "$BASE_DIR" -type d -name "bundle" | while IFS= read -r BUNDLE_DIR; do
+            echo "Searching in bundle directory: $BUNDLE_DIR"
+            
+            find "$BUNDLE_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while IFS= read -r FILE; do
+              if [ -f "$FILE" ]; then
+                FOUND_FILES=1
+                EXT="${FILE##*.}"
+                DIR=$(dirname "$FILE")
+                BASENAME=$(basename "$FILE")
+                NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
+                
+                echo "Renaming \"$BASENAME\" to \"$NEW_NAME\""
+                mv "$FILE" "$DIR/$NEW_NAME"
+              fi
+            done
           done
+
+          echo "Rename completed."
 
           # Handle .app.tar.gz if it exists or create it?
           # Tauri action might not create tar.gz automatically if we disabled release? 
