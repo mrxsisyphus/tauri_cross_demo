@@ -62,8 +62,19 @@ jobs:
 
           # 获取 workspace 名称 (通常是 项目名.xcodeproj)
           XCODE_PROJECT=$(find . -name "*.xcodeproj" -maxdepth 1 | head -n 1)
-          SCHEME_NAME=$(basename "$XCODE_PROJECT" .xcodeproj)
 
+          # 动态获取 Scheme 名称
+          # xcodebuild -list 的输出包含了 Schemes: 接下来的行
+          echo "Listing schemes..."
+          SCHEME_NAME=$(xcodebuild -list -project "$XCODE_PROJECT" | awk '/Schemes:/{flag=1; next} flag && /^[[:space:]]/{print $1; exit}')
+
+          if [ -z "$SCHEME_NAME" ]; then
+            echo "Error: Could not determine Scheme name."
+            xcodebuild -list -project "$XCODE_PROJECT"
+            exit 1
+          fi
+
+          echo "Found Project: $XCODE_PROJECT"
           echo "Building Scheme: $SCHEME_NAME"
 
           xcodebuild archive \
