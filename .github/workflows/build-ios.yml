@@ -49,6 +49,21 @@ jobs:
           bun tauri build --no-bundle
           bun tauri ios init
 
+      # 3.1 启动 Tauri iOS options server（xcode-script 需要读取它）
+      - name: Start Tauri iOS Options Server
+        working-directory: ./app
+        run: |
+          bun tauri ios build --open --ci >/tmp/tauri-ios-options.log 2>&1 &
+          echo "TAURI_IOS_OPTIONS_PID=$!" >> "$GITHUB_ENV"
+          sleep 6
+      - name: Show Options Server Log (on failure)
+        if: failure()
+        run: |
+          if [ -f /tmp/tauri-ios-options.log ]; then
+            echo "---- /tmp/tauri-ios-options.log (tail) ----"
+            tail -n 200 /tmp/tauri-ios-options.log
+          fi
+
       # 4. 用 xcodebuild 直接 build（不 archive），避免必须要 provisioning profile
       # 解释参数：
       # - CODE_SIGNING_ALLOWED="NO": 不进行签名
@@ -81,7 +96,7 @@ jobs:
           xcodebuild build \
             -project "$XCODE_PROJECT" \
             -scheme "$SCHEME_NAME" \
-            -configuration Release \
+            -configuration release \
             -destination "generic/platform=iOS" \
             -derivedDataPath "$DERIVED_DATA" \
             CODE_SIGNING_ALLOWED="NO" \
@@ -92,7 +107,11 @@ jobs:
             PROVISIONING_PROFILE_SPECIFIER="" \
             PROVISIONING_PROFILE=""
 
-          APP_PATH=$(find "$DERIVED_DATA/Build/Products" -type d -name "*.app" | head -n 1)
+          APP_DIR="$DERIVED_DATA/Build/Products/release-iphoneos"
+          APP_PATH=$(find "$APP_DIR" -maxdepth 1 -type d -name "*.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find "$DERIVED_DATA/Build/Products" -type d -name "*.app" | head -n 1)
+          fi
           if [ -z "$APP_PATH" ]; then
             echo "Error: Could not find built .app in $DERIVED_DATA"
             exit 1
@@ -115,6 +134,20 @@ jobs:
           zip -r "$IPA_NAME" Payload
 
           echo "IPA Created at $(pwd)/$IPA_NAME"
+
+      - name: Stop Tauri iOS Options Server
+        if: always()
+        run: |
+          if [ -n "${TAURI_IOS_OPTIONS_PID:-}" ]; then
+            kill "$TAURI_IOS_OPTIONS_PID" || true
+          fi
+      - name: Upload Options Server Log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-options-log
+          path: /tmp/tauri-ios-options.log
+          if-no-files-found: ignore
 
       # 6. 上传 Artifact (给用户下载)
       - name: Upload IPA

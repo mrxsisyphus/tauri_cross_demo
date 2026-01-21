@@ -86,6 +86,7 @@ jobs:
           args: ${{ matrix.args }}
 
       - name: Rename Artifacts
+        shell: bash
         run: |
           TAG_NAME="${{ github.ref_name }}"
           # Determine Architecture Name

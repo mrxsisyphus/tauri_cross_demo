@@ -12,7 +12,7 @@ settingGroups:
     base:
       PRODUCT_NAME: Todo Cross
       PRODUCT_BUNDLE_IDENTIFIER: com.example.todocross
-      DEVELOPMENT_TEAM: YOUR_TEAM_ID
+      DEVELOPMENT_TEAM: TEAMID12347
 targetTemplates:
   app:
     type: application
