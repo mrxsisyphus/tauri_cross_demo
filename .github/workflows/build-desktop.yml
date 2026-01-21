@@ -1,11 +1,12 @@
-name: "Build Desktop"
+name: 'Build Desktop'
 
 on:
   push:
     branches:
+      - main
       - release
     tags:
-      - "v*"
+      - 'v*'
   pull_request:
     branches:
       - main
@@ -26,21 +27,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: "macos-latest"
-            args: "--target aarch64-apple-darwin"
-            target: "aarch64-apple-darwin"
-          - platform: "macos-latest"
-            args: "--target x86_64-apple-darwin"
-            target: "x86_64-apple-darwin"
-          - platform: "ubuntu-22.04"
-            args: ""
-            target: ""
-          - platform: "windows-latest"
-            args: ""
-            target: ""
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+            target: 'aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+            target: 'x86_64-apple-darwin'
+          - platform: 'ubuntu-22.04'
+            args: ''
+            target: ''
+          - platform: 'windows-latest'
+            args: ''
+            target: ''
 
     runs-on: ${{ matrix.platform }}
-
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -53,7 +54,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version: 'lts/*'
 
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
@@ -76,130 +77,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           projectPath: ./app
-          # 只禁用自动发布，但保留构建
-          tagName: ${{ github.ref_name }}
-          releaseName: Release ${{ github.ref_name }}
-          releaseBody: |
-            Auto-generated release for ${{ github.ref_name }}
-            
-            ## Installation
-            - **Windows**: Download `.exe` or `.msi`
-            - **macOS**: Download `.dmg` for Intel or ARM Macs
-            - **Linux**: Download `.deb`, `.rpm`, or `.AppImage`
+          # Only create/upload releases for tags
+          tagName: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          releaseName: 'Todo Cross ${{ github.ref_name }}'
+          releaseBody: 'See the assets to download this version and install.'
           releaseDraft: false
           prerelease: false
           args: ${{ matrix.args }}
-
-      - name: Rename Artifacts
-        shell: bash
-        run: |
-          TAG_NAME="${{ github.ref_name }}"
-          PLATFORM="${{ matrix.platform }}"
-          TARGET="${{ matrix.target }}"
-
-          if [ -n "$TARGET" ]; then
-            ARCH_NAME="$TARGET"
-          elif [ "$PLATFORM" == "ubuntu-22.04" ]; then
-            ARCH_NAME="amd64"
-          elif [ "$PLATFORM" == "windows-latest" ]; then
-            ARCH_NAME="x64"
-          else
-            ARCH_NAME="universal"
-          fi
-
-          echo "Renaming artifacts for ARCH: $ARCH_NAME, TAG: $TAG_NAME"
-
-          # 查找所有可能的构建产物位置
-          BASE_DIR="app/src-tauri/target"
-          
-          # 如果有指定 target，先查找特定目标目录
-          if [ -n "$TARGET" ] && [ -d "$BASE_DIR/$TARGET" ]; then
-            SEARCH_DIRS="$BASE_DIR/$TARGET"
-          else
-            SEARCH_DIRS="$BASE_DIR"
-          fi
-
-          FOUND_FILES=0
-          
-          # 查找所有 bundle 文件并重命名
-          while IFS= read -r FILE; do
-            if [ -f "$FILE" ]; then
-              FOUND_FILES=1
-              EXT="${FILE##*.}"
-              DIR=$(dirname "$FILE")
-              BASENAME=$(basename "$FILE")
-              NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
-              
-              echo "Found: $BASENAME -> $NEW_NAME"
-              mv "$FILE" "$DIR/$NEW_NAME"
-            fi
-          done < <(find $SEARCH_DIRS -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" -o -name "*.tar.gz" \) 2>/dev/null)
-
-          # 特殊处理 macOS .app 文件（如果存在且未打包）
-          if [ "$PLATFORM" == "macos-latest" ]; then
-            while IFS= read -r APP_DIR; do
-              if [ -d "$APP_DIR" ]; then
-                FOUND_FILES=1
-                DIR=$(dirname "$APP_DIR")
-                BASENAME=$(basename "$APP_DIR")
-                NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.app"
-                
-                echo "Found app bundle: $BASENAME -> $NEW_NAME"
-                mv "$APP_DIR" "$DIR/$NEW_NAME"
-                
-                # 创建 tar.gz
-                cd "$DIR"
-                tar -czf "${NEW_NAME}.tar.gz" "$NEW_NAME"
-                echo "Created: ${NEW_NAME}.tar.gz"
-              fi
-            done < <(find $SEARCH_DIRS -type d -name "*.app" 2>/dev/null)
-          fi
-
-          if [ "$FOUND_FILES" -eq 0 ]; then
-            echo "Warning: No artifacts found to rename!"
-            echo "Available files:"
-            find $BASE_DIR -type f -name "*" | head -20 || echo "No files found"
-          else
-            echo "Successfully renamed $FOUND_FILES artifact(s)"
-          fi
-
-      - name: List Artifacts for Upload
-        shell: bash
-        run: |
-          echo "=== Listing renamed artifacts ==="
-          find app/src-tauri/target -type f -name "todo_cross-*" || echo "No todo_cross-* files found"
-          echo ""
-          echo "=== Listing all bundle files ==="
-          find app/src-tauri/target -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) || echo "No bundle files found"
-
-      - name: Upload Artifacts to Release
-        if: startsWith(github.ref, 'refs/tags/')
-        uses: softprops/action-gh-release@v2
-        with:
-          # Use wildcards to find the renamed files
-          files: |
-            app/src-tauri/target/**/todo_cross-*.deb
-            app/src-tauri/target/**/todo_cross-*.rpm
-            app/src-tauri/target/**/todo_cross-*.AppImage
-            app/src-tauri/target/**/todo_cross-*.dmg
-            app/src-tauri/target/**/todo_cross-*.exe
-            app/src-tauri/target/**/todo_cross-*.msi
-            app/src-tauri/target/**/todo_cross-*.tar.gz
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.target || 'native' }}
           path: |
-            app/src-tauri/target/**/todo_cross-*.deb
-            app/src-tauri/target/**/todo_cross-*.rpm
-            app/src-tauri/target/**/todo_cross-*.AppImage
-            app/src-tauri/target/**/todo_cross-*.dmg
-            app/src-tauri/target/**/todo_cross-*.exe
-            app/src-tauri/target/**/todo_cross-*.msi
-            app/src-tauri/target/**/todo_cross-*.tar.gz
+            app/src-tauri/target/release/bundle/**/*.dmg
             app/src-tauri/target/release/bundle/**/*.app
+            app/src-tauri/target/release/bundle/**/*.deb
+            app/src-tauri/target/release/bundle/**/*.AppImage
+            app/src-tauri/target/release/bundle/**/*.msi
+            app/src-tauri/target/release/bundle/**/*.exe
+            app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.dmg
             app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app
           if-no-files-found: ignore
