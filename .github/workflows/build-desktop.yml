@@ -89,102 +89,46 @@ jobs:
         shell: bash
         run: |
           TAG_NAME="${{ github.ref_name }}"
-          PLATFORM="${{ matrix.platform }}"
           TARGET="${{ matrix.target }}"
-
+          
+          # 确定正确的 bundle 目录
           if [ -n "$TARGET" ]; then
+            BUNDLE_DIR="app/src-tauri/target/$TARGET/release/bundle"
             ARCH_NAME="$TARGET"
-          elif [ "$PLATFORM" == "ubuntu-22.04" ]; then
-            ARCH_NAME="amd64"
-          elif [ "$PLATFORM" == "windows-latest" ]; then
-            ARCH_NAME="x64"
           else
-            ARCH_NAME="universal"
+            BUNDLE_DIR="app/src-tauri/target/release/bundle"
+            case "${{ matrix.platform }}" in
+              ubuntu-22.04) ARCH_NAME="amd64" ;;
+              windows-latest) ARCH_NAME="x64" ;;
+              *) ARCH_NAME="universal" ;;
+            esac
           fi
 
-          echo "Renaming artifacts for ARCH: $ARCH_NAME, TAG: $TAG_NAME"
+          echo "Looking for artifacts in: $BUNDLE_DIR"
+          echo "ARCH: $ARCH_NAME, TAG: $TAG_NAME"
 
-          # 只在 bundle 目录中查找最终的安装包
-          # 这样可以避免重命名中间构建文件
-          BASE_DIR="app/src-tauri/target"
-
-          if [ ! -d "$BASE_DIR" ]; then
-            echo "Warning: Directory $BASE_DIR not found, skipping rename."
+          if [ ! -d "$BUNDLE_DIR" ]; then
+            echo "Bundle directory not found: $BUNDLE_DIR"
+            echo "Listing available directories:"
+            ls -la app/src-tauri/target/ 2>/dev/null || echo "target dir not found"
             exit 0
           fi
 
-          # 调试：列出所有 target 目录
-          echo "=== Debug: Listing target directories ==="
-          find "$BASE_DIR" -maxdepth 2 -type d -name "release" -o -name "debug" | head -20
-          
-          # 调试：列出所有 bundle 目录
-          echo "=== Debug: Listing bundle directories ==="
-          find "$BASE_DIR" -type d -name "bundle" | head -20
-
-          # 查找所有 bundle 子目录中的安装包
-          # Windows: bundle/msi/*.msi, bundle/nsis/*.exe
-          # macOS: bundle/dmg/*.dmg, bundle/macos/*.app (will be tar'd separately)
-          # Linux: bundle/deb/*.deb, bundle/rpm/*.rpm, bundle/appimage/*.AppImage
-
-          FOUND_FILES=0
-          # 使用 process substitution 避免子shell问题
-          while IFS= read -r BUNDLE_DIR; do
-            echo "Searching in bundle directory: $BUNDLE_DIR"
-            
-            # 调试：列出该 bundle 目录下的所有文件
-            echo "Files in $BUNDLE_DIR:"
-            find "$BUNDLE_DIR" -type f | head -20 || true
-            
-            while IFS= read -r FILE; do
-              if [ -f "$FILE" ]; then
-                FOUND_FILES=1
-                EXT="${FILE##*.}"
-                DIR=$(dirname "$FILE")
-                BASENAME=$(basename "$FILE")
-                NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
-                
-                echo "Found file: $BASENAME"
-                echo "Renaming \"$BASENAME\" to \"$NEW_NAME\""
-                mv "$FILE" "$DIR/$NEW_NAME"
-                echo "Renamed successfully: $DIR/$NEW_NAME"
-              fi
-            done < <(find "$BUNDLE_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \))
-          done < <(find "$BASE_DIR" -type d -name "bundle")
-
-          if [ "$FOUND_FILES" -eq 0 ]; then
-            echo "Warning: No bundle files found to rename!"
-            echo "Listing all files in target directory for debugging:"
-            find "$BASE_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | head -20 || true
-          else
-            echo "Rename completed. Found and renamed $FOUND_FILES file(s)."
-          fi
-
-          # Handle .app.tar.gz if it exists or create it?
-          # Tauri action might not create tar.gz automatically if we disabled release? 
-          # Actually tauri-action usually creates tar.gz for updater if configured.
-          # Let's just stick to the main bundles for now.
-
-      - name: List Artifacts for Upload
-        shell: bash
-        run: |
-          echo "=== Listing renamed artifacts ==="
-          find app/src-tauri/target -type f -name "todo_cross-*" || echo "No todo_cross-* files found"
-          echo ""
-          echo "=== Listing all bundle files ==="
-          find app/src-tauri/target -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) || echo "No bundle files found"
+          # 重命名所有 bundle 文件
+          find "$BUNDLE_DIR" -type f \( -name "*.deb" -o -name "*.rpm" -o -name "*.AppImage" -o -name "*.dmg" -o -name "*.exe" -o -name "*.msi" \) | while read FILE; do
+            EXT="${FILE##*.}"
+            DIR=$(dirname "$FILE")
+            NEW_NAME="todo_cross-${TAG_NAME}-${ARCH_NAME}.${EXT}"
+            echo "Renaming: $(basename "$FILE") -> $NEW_NAME"
+            mv "$FILE" "$DIR/$NEW_NAME"
+          done
 
       - name: Upload Artifacts to Release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          # Use wildcards to find the renamed files
           files: |
-            app/src-tauri/target/**/todo_cross-*.deb
-            app/src-tauri/target/**/todo_cross-*.rpm
-            app/src-tauri/target/**/todo_cross-*.AppImage
-            app/src-tauri/target/**/todo_cross-*.dmg
-            app/src-tauri/target/**/todo_cross-*.exe
-            app/src-tauri/target/**/todo_cross-*.msi
+            app/src-tauri/target/**/bundle/**/todo_cross-*.*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -193,12 +137,6 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.target || 'native' }}
           path: |
-            app/src-tauri/target/**/todo_cross-*.deb
-            app/src-tauri/target/**/todo_cross-*.rpm
-            app/src-tauri/target/**/todo_cross-*.AppImage
-            app/src-tauri/target/**/todo_cross-*.dmg
-            app/src-tauri/target/**/todo_cross-*.exe
-            app/src-tauri/target/**/todo_cross-*.msi
-            app/src-tauri/target/release/bundle/**/*.app
-            app/src-tauri/target/${{ matrix.target }}/release/bundle/**/*.app
+            app/src-tauri/target/**/bundle/**/todo_cross-*.*
+            app/src-tauri/target/**/bundle/**/*.app
           if-no-files-found: ignore
