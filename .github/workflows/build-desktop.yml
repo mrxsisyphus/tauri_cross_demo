@@ -91,12 +91,12 @@ jobs:
           TAG_NAME="${{ github.ref_name }}"
           TARGET="${{ matrix.target }}"
           
-          # 确定正确的 bundle 目录
+          # 确定正确的 bundle 目录（可能在 target/ 或 app/target/）
           if [ -n "$TARGET" ]; then
-            BUNDLE_DIR="app/src-tauri/target/$TARGET/release/bundle"
+            BUNDLE_DIR=$(find . -type d -path "*/target/$TARGET/release/bundle" | head -n 1)
             ARCH_NAME="$TARGET"
           else
-            BUNDLE_DIR="app/src-tauri/target/release/bundle"
+            BUNDLE_DIR=$(find . -type d -path "*/target/release/bundle" | head -n 1)
             case "${{ matrix.platform }}" in
               ubuntu-22.04) ARCH_NAME="amd64" ;;
               windows-latest) ARCH_NAME="x64" ;;
@@ -104,13 +104,12 @@ jobs:
             esac
           fi
 
-          echo "Looking for artifacts in: $BUNDLE_DIR"
+          echo "Looking for artifacts in: ${BUNDLE_DIR:-<not found>}"
           echo "ARCH: $ARCH_NAME, TAG: $TAG_NAME"
 
-          if [ ! -d "$BUNDLE_DIR" ]; then
-            echo "Bundle directory not found: $BUNDLE_DIR"
-            echo "Listing available directories:"
-            ls -la app/src-tauri/target/ 2>/dev/null || echo "target dir not found"
+          if [ -z "$BUNDLE_DIR" ] || [ ! -d "$BUNDLE_DIR" ]; then
+            echo "Bundle directory not found. Available bundle directories:"
+            find . -type d \( -path "*/target/*/release/bundle" -o -path "*/target/release/bundle" \) | head -n 20
             exit 0
           fi
 
@@ -128,7 +127,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            app/src-tauri/target/**/bundle/**/todo_cross-*.*
+            **/target/**/bundle/**/todo_cross-*.*
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -137,6 +136,6 @@ jobs:
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.target || 'native' }}
           path: |
-            app/src-tauri/target/**/bundle/**/todo_cross-*.*
-            app/src-tauri/target/**/bundle/**/*.app
+            **/target/**/bundle/**/todo_cross-*.*
+            **/target/**/bundle/**/*.app
           if-no-files-found: ignore
