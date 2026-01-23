@@ -36,6 +36,12 @@ jobs:
         with:
           targets: aarch64-apple-ios
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "app/src-tauri -> target"
+          shared-key: ios
+
       # 2. 安装依赖
       - name: Install Dependencies
         working-directory: ./app

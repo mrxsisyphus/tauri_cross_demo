@@ -62,6 +62,12 @@ jobs:
         with:
           targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
 
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "app/src-tauri -> target"
+          shared-key: android
+
       - name: Install frontend dependencies
         working-directory: ./app
         run: bun install
